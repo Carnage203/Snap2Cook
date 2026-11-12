@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -20,9 +21,15 @@ TIER_LABELS = {"hostel": "Hostel (kettle only)", "pg": "PG (one appliance)", "ho
 TIME_OPTIONS = [10, 15, 20, 30, 45, 60, 90, "Any"]
 
 
+def code_version() -> str:
+    """Changes whenever a source file changes, so a redeploy never reuses objects built by old code."""
+    root = Path(__file__).parent
+    return str(max(f.stat().st_mtime_ns for f in [Path(__file__), *(root / "snap2cook").rglob("*.py")]))
+
+
 @st.cache_resource(show_spinner="Loading recipe library...")
-def get_app() -> App:
-    """Build the long-lived objects once per server process."""
+def get_app(version: str) -> App:
+    """Build the long-lived objects once per server process (and once per code version)."""
     settings = Settings.load()
     setup_logging(settings)
     return build_app(settings)
@@ -134,7 +141,7 @@ def main() -> None:
     """App entry point."""
     st.session_state.setdefault("sid", uuid.uuid4().hex)
     try:
-        app = get_app()
+        app = get_app(code_version())
         tier, conditions, extras = sidebar(app)
     except Snap2CookError as exc:
         st.error(exc.user_message)
