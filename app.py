@@ -9,7 +9,6 @@ import streamlit as st
 from snap2cook.bootstrap import App, build_app
 from snap2cook.config import Settings
 from snap2cook.exceptions import Snap2CookError
-from snap2cook.fileio.text_tools import FileTextProcessor
 from snap2cook.logging_setup import new_request_id, setup_logging
 from snap2cook.models import Conditions, PipelineResult
 from snap2cook.tiers import Tier, TierFactory
@@ -80,7 +79,7 @@ def ingredient_editor(app: App) -> list[str]:
 
 
 def show_result(result: PipelineResult) -> None:
-    """Render the recipe card and the 'how this was made' expander."""
+    """Render the recipe card or the "nothing to make" message."""
     recipe = result.recipe
     if recipe is None:
         st.info("You can't make a proper dish with this kitchen and these items yet.")
@@ -98,17 +97,9 @@ def show_result(result: PipelineResult) -> None:
         st.warning("Safety: " + recipe.safety_note, icon="⚠️")
         st.caption("Based on recipes: " + ", ".join(recipe.source_recipe_ids))
         st.download_button("Download recipe (.txt)", str(recipe), file_name="snap2cook_recipe.txt")
-    with st.expander("How this was made"):
-        st.write({"mode": result.mode, "fallback_used": result.fallback_used, "cache_hits": result.cache_hits,
-                  "timings_s": {k: round(v, 3) for k, v in result.timings.items()}})
-        st.write("Ingredients (pandas Series)")
-        st.dataframe(result.ingredients)
-        if result.candidates:
-            st.write("Retrieved candidates")
-            st.dataframe(pd.DataFrame(result.candidates).set_index("id"))
 
 
-def cook_tab(app: App, tier: Tier, conditions: Conditions, extras: list[str]) -> None:
+def cook_section(app: App, tier: Tier, conditions: Conditions, extras: list[str]) -> None:
     """The main flow: photo -> editable list -> recipe."""
     detect_from_photo(app)
     names = ingredient_editor(app)
@@ -118,45 +109,11 @@ def cook_tab(app: App, tier: Tier, conditions: Conditions, extras: list[str]) ->
             with st.spinner("Cooking something up..."):
                 result = app.pipeline.recommend(names, tier, conditions, extras, st.session_state["sid"])
             st.session_state["result"] = result
-            st.session_state["recipe_text"] = str(result.recipe) if result.recipe else ""
         except Snap2CookError as exc:
             st.session_state.pop("result", None)
             st.error(exc.user_message)
     if "result" in st.session_state:
         show_result(st.session_state["result"])
-
-
-def text_tools_tab() -> None:
-    """Syllabus Q6 on an uploaded .txt or the last recipe."""
-    st.write("Run the four text operations on a `.txt` file or on your last recipe.")
-    upload = st.file_uploader("Upload a .txt file", type=["txt"])
-    text = st.session_state.get("recipe_text", "")
-    if upload is not None:
-        try:
-            text = upload.getvalue().decode("utf-8")
-        except UnicodeDecodeError:
-            st.error("That file is not readable UTF-8 text.")
-            return
-    text = st.text_area("Text", value=text, height=150)
-    proc = FileTextProcessor(text)
-    actions = {"Reverse each word": proc.reverse_each_word, "Reverse word order per line": proc.reverse_word_order_per_line,
-               "Reverse line order": proc.reverse_line_order, "Remove whitespace": proc.strip_whitespace}
-    for label, action in actions.items():
-        if st.button(label):
-            st.code(action() or "(empty)")
-
-
-def about_tab() -> None:
-    """Map syllabus questions and OOP concepts to code (helps the viva)."""
-    st.table(pd.DataFrame([
-        ("Q6 File text processing", "fileio/text_tools.py - FileTextProcessor", "Text Tools tab"),
-        ("Q8 File error handling", "fileio/safe_io.py - SafeFile", "corpus, cache, logs, config files"),
-        ("Q9 User-defined exceptions", "exceptions.py", "every error message you see"),
-        ("Q10 Pandas Series", "analytics/series.py", "ingredient confidences and scores"),
-        ("OOP: Strategy + Factory", "tiers.py - Tier, TierFactory", "sidebar kitchen choice"),
-        ("OOP: ABCs / polymorphism", "VisionProvider, Embedder, CorpusStore, Generator", "Live vs Mock mode"),
-        ("OOP: Dependency injection", "pipeline.py / bootstrap.py", "Pipeline(...) constructor"),
-    ], columns=["Topic", "Where", "In the app"]))
 
 
 def main() -> None:
@@ -170,13 +127,7 @@ def main() -> None:
         st.stop()
     st.title("Snap2Cook")
     st.caption("Photo of your ingredients in, a recipe that fits your kitchen out.")
-    cook, tools, about = st.tabs(["Cook", "Text Tools", "About"])
-    with cook:
-        cook_tab(app, tier, conditions, extras)
-    with tools:
-        text_tools_tab()
-    with about:
-        about_tab()
+    cook_section(app, tier, conditions, extras)
 
 
 main()

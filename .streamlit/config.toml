@@ -1,6 +1,17 @@
+# Theme follows the device setting by default; users can also pick Light / Dark / System
+# from the app's top-right menu (three dots) -> Settings -> Theme.
 [theme]
 primaryColor = "#E4572E"
-base = "light"
+
+[theme.light]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F1EE"
+textColor = "#1F1F1F"
+
+[theme.dark]
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1F2B"
+textColor = "#F2F2F2"
 
 [server]
 maxUploadSize = 6
