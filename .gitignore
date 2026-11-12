@@ -1,9 +1,40 @@
-.venv/
+# --- Secrets (never commit) ---
 .env
+.env.*
+!.env.example
 .streamlit/secrets.toml
+*.pem
+*.key
+
+# --- Virtual environment ---
+.venv/
+venv/
+env/
+
+# --- Python build / cache artefacts ---
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+build/
+dist/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Runtime output (recreated on every run) ---
 logs/
 *.log
 .cache/
+snap2cook_cache/
+
+# --- Editor / OS files ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Local-only notes (kept on disk, not pushed) ---
+Changes.md
