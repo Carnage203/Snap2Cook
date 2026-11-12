@@ -48,19 +48,33 @@ def sidebar(app: App) -> tuple[Tier, Conditions, list[str]]:
 
 
 def detect_from_photo(app: App) -> None:
-    """Handle upload/camera input and store detected ingredients in session state."""
+    """Handle upload/camera input (up to max_photos photos) and store detected ingredients."""
+    limit = app.settings.max_photos
     source = st.radio("Photo source", ["Upload", "Camera"], horizontal=True)
-    photo = st.file_uploader("Photo of your ingredients", type=["jpg", "jpeg", "png", "webp"]) \
-        if source == "Upload" else st.camera_input("Take a photo")
-    if photo is None:
+    if source == "Upload":
+        photos = st.file_uploader(f"Photos of your ingredients (up to {limit}, one item per photo works well)",
+                                  type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
+    else:
+        single = st.camera_input("Take a photo")
+        photos = [single] if single is not None else []
+    if len(photos) > limit:
+        st.warning(f"Only the first {limit} photos are used.")
+        photos = photos[:limit]
+    if not photos:
         return
     try:
-        image = ImageValidator().prepare(photo.getvalue())
-        st.image(image.data, width="stretch")
-        if st.session_state.get("image_hash") != image.sha256:
+        images = [ImageValidator().prepare(photo.getvalue()) for photo in photos]
+        if len(images) == 1:
+            st.image(images[0].data, width="stretch")
+        else:
+            st.image([image.data for image in images], width=150)
+        key = "|".join(sorted(image.sha256 for image in images))
+        if st.session_state.get("image_hash") != key:
             with st.spinner("Looking at your ingredients..."):
-                series, hit = app.pipeline.detect(image)
-            st.session_state.update(image_hash=image.sha256, detected=series, detect_cached=hit)
+                series, empty = app.pipeline.detect_many(images)
+            st.session_state.update(image_hash=key, detected=series)
+            if empty:
+                st.info(f"{empty} photo(s) showed no recognisable food and were skipped.")
     except Snap2CookError as exc:
         st.session_state["image_hash"] = None
         st.warning(exc.user_message)

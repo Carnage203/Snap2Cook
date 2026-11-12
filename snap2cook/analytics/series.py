@@ -19,6 +19,14 @@ def ingredient_series(items: Iterable[DetectedIngredient]) -> pd.Series:
     return series.groupby(level=0).max().sort_values(ascending=False)
 
 
+def merge_ingredient_series(parts: Iterable[pd.Series]) -> pd.Series:
+    """Combine per-photo ingredient Series into one (best confidence per name, sorted high to low)."""
+    parts = [part for part in parts if not part.empty]
+    if not parts:
+        return pd.Series(dtype=float, name="confidence")
+    return pd.concat(parts).groupby(level=0).max().rename("confidence").sort_values(ascending=False)
+
+
 def score_series(pairs: Iterable[tuple[str, float]]) -> pd.Series:
     """Recipe id -> final score, sorted high to low."""
     pairs = list(pairs)

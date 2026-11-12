@@ -43,6 +43,7 @@ class Settings:
     rate_limit_calls: int = 6
     rate_limit_window_s: int = 600
     daily_limit: int = 300
+    max_photos: int = 3
     api_timeout_s: int = 30
     api_retries: int = 2
     vision_ttl_s: int = 7 * 24 * 3600

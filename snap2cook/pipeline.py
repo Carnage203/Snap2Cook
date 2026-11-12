@@ -5,11 +5,11 @@ import hashlib
 import json
 import logging
 import time
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import pandas as pd
 
-from snap2cook.analytics.series import ingredient_series, score_series
+from snap2cook.analytics.series import ingredient_series, merge_ingredient_series, score_series
 from snap2cook.cache import Cache
 from snap2cook.config import Settings
 from snap2cook.exceptions import GenerationError, NoIngredientsDetectedError
@@ -52,6 +52,22 @@ class Pipeline:
             raise NoIngredientsDetectedError("No ingredients left after normalisation")
         self._cache.set(key, series.to_dict(), self._settings.vision_ttl_s)
         return series, False
+
+    def detect_many(self, images: Sequence[PreparedImage]) -> tuple[pd.Series, int]:
+        """Detect across several photos (each cached) and merge. Returns (Series, photos_with_no_items).
+
+        A photo with nothing recognisable is skipped; the call fails only if every photo is empty.
+        """
+        parts, empty = [], 0
+        for image in images[: self._settings.max_photos]:
+            try:
+                parts.append(self.detect(image)[0])
+            except NoIngredientsDetectedError:
+                empty += 1
+        merged = merge_ingredient_series(parts)
+        if merged.empty:
+            raise NoIngredientsDetectedError("No ingredients found in any photo")
+        return merged, empty
 
     @staticmethod
     def _recipe_key(tier: Tier, ingredients: list[str], extras: list[str], conditions: Conditions) -> str:

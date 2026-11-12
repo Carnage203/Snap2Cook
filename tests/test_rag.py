@@ -159,3 +159,19 @@ def test_grounding_rejects_invented_ingredient_and_technique(retriever, hostel) 
                           source_recipe_ids=[result.recipes[0].recipe.id])
     problems = validate_grounded(bad, ctx)
     assert any("saffron" in p for p in problems) and any("fry" in p for p in problems)
+
+
+def test_detect_many_merges_photos_and_limits_to_max(make_pipeline) -> None:
+    from PIL import Image
+
+    def png(color: str) -> bytes:
+        buffer = io.BytesIO()
+        Image.new("RGB", (64, 64), color).save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    pipeline = make_pipeline(CountingGenerator())
+    images = [ImageValidator().prepare(png(c)) for c in ("red", "green", "blue", "white")]
+    single = pipeline.detect(images[0])[0]
+    merged, empty = pipeline.detect_many(images)
+    assert empty == 0 and merged.name == "confidence" and set(single.index) <= set(merged.index)
+    assert merged.index.is_unique
