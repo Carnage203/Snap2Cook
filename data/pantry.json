@@ -1,0 +1,9 @@
+{
+  "staples": {
+    "home": ["water", "salt"],
+    "pg": ["water", "salt"],
+    "hostel": ["water", "salt"]
+  },
+  "extras": ["oil", "ghee", "butter", "sugar", "turmeric", "chili powder", "cumin", "garam masala",
+             "black pepper", "mustard seeds", "soy sauce", "rice", "wheat flour", "milk"]
+}
