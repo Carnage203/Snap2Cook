@@ -136,3 +136,22 @@ def test_image_validator_accepts_png_and_resizes() -> None:
 def test_image_validator_rejects_bad_input(raw: bytes) -> None:
     with pytest.raises(InvalidImageError):
         ImageValidator().prepare(raw)
+
+
+def test_model_fallback_moves_to_next_model_and_dedupes() -> None:
+    from snap2cook.exceptions import GenerationError
+    from snap2cook.gemini import call_with_model_fallback, model_chain
+
+    assert model_chain("a", ("b", "a", "c")) == ("a", "b", "c")
+    tried: list[str] = []
+
+    def call(model: str) -> str:
+        tried.append(model)
+        if model != "c":
+            raise RuntimeError("503 overloaded")
+        return "ok"
+
+    assert call_with_model_fallback(("a", "b", "c"), call, GenerationError, "x", retries=0) == "ok"
+    assert tried == ["a", "b", "c"]
+    with pytest.raises(GenerationError):
+        call_with_model_fallback(("a", "b"), call, GenerationError, "x", retries=0)

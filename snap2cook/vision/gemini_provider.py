@@ -8,7 +8,7 @@ from google.genai import types
 from pydantic import ValidationError
 
 from snap2cook.exceptions import NoIngredientsDetectedError, VisionProviderError
-from snap2cook.gemini import call_with_retries
+from snap2cook.gemini import call_with_model_fallback
 from snap2cook.models import DetectedIngredient, DetectionResult
 from snap2cook.vision.base import VisionProvider
 
@@ -25,18 +25,18 @@ PROMPT = (
 class GeminiVisionProvider(VisionProvider):
     """Calls Gemini in JSON mode with a pydantic response schema."""
 
-    def __init__(self, client: genai.Client, model: str, retries: int = 2) -> None:
+    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2) -> None:
         self._client = client
-        self._model = model
+        self._models = models
         self._retries = retries
 
     @property
     def name(self) -> str:
-        return f"gemini:{self._model}"
+        return f"gemini:{self._models[0]}"
 
-    def _call(self, image_bytes: bytes) -> str | None:
+    def _call(self, model: str, image_bytes: bytes) -> str | None:
         response = self._client.models.generate_content(
-            model=self._model,
+            model=model,
             contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), PROMPT],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json", response_schema=DetectionResult, temperature=0.0),
@@ -46,8 +46,9 @@ class GeminiVisionProvider(VisionProvider):
     def detect(self, image_bytes: bytes) -> list[DetectedIngredient]:
         """Detect ingredients; one repair retry if the JSON is invalid."""
         for attempt in (1, 2):
-            text = call_with_retries(lambda: self._call(image_bytes), VisionProviderError,
-                                     "Vision request", self._retries)
+            text = call_with_model_fallback(
+                self._models, lambda model: self._call(model, image_bytes), VisionProviderError,
+                "Vision request", self._retries)
             try:
                 result = DetectionResult.model_validate_json(text or "")
                 break

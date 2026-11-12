@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from snap2cook.cache import FileCache, LRUCache, TieredCache
 from snap2cook.config import Settings
-from snap2cook.gemini import build_client
+from snap2cook.gemini import build_client, model_chain
 from snap2cook.limiter import RateLimiter
 from snap2cook.pipeline import Pipeline
 from snap2cook.rag.embedder import GeminiEmbedder, LexicalEmbedder
@@ -44,9 +44,9 @@ def build_app(settings: Settings) -> App:
     reranker = CoverageReranker.from_settings(settings)
     if settings.live_mode:
         client = build_client(settings)
-        vision = GeminiVisionProvider(client, settings.vision_model, settings.api_retries)
+        vision = GeminiVisionProvider(client, model_chain(settings.vision_model, settings.fallback_models), settings.api_retries)
         embedder = GeminiEmbedder(client, settings.embed_model, settings.embed_dim, settings.api_retries)
-        generator = GeminiGenerator(client, settings.gen_model, settings.api_retries)
+        generator = GeminiGenerator(client, model_chain(settings.gen_model, settings.fallback_models), settings.api_retries)
     else:
         vision, embedder, generator = MockVisionProvider(), lexical, VerbatimGenerator()
     retriever = Retriever(corpus, embedder, reranker, lexical, cache)

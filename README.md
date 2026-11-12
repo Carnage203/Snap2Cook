@@ -24,7 +24,7 @@ copy .env.example .env        # then edit .env (it is gitignored)
 ```
 
 All secrets live in `.env` (or Streamlit secrets in the cloud): `GEMINI_API_KEY`, `VISION_MODEL`, `GEN_MODEL`,
-`EMBED_MODEL`, `EMBED_DIM`, `HF_DATASET_REPO`, `HF_TOKEN` (HF token is only used by the upload script).
+`FALLBACK_MODELS` (tried in order if the main model fails), `EMBED_MODEL`, `EMBED_DIM`, `HF_DATASET_REPO`, `HF_TOKEN` (HF token is only used by the upload script).
 Config read order: `st.secrets` -> OS environment -> `.env`. Leave `GEMINI_API_KEY` empty for Mock mode.
 
 ## One-time data steps (need your accounts)
@@ -56,8 +56,9 @@ Config read order: `st.secrets` -> OS environment -> `.env`. Leave `GEMINI_API_K
 3. Advanced settings: Python 3.11, and paste secrets (TOML):
    ```toml
    GEMINI_API_KEY = "..."
-   VISION_MODEL = "gemini-3.7-flash"
-   GEN_MODEL = "gemini-3.7-flash"
+   VISION_MODEL = "gemini-3.6-flash"
+   GEN_MODEL = "gemini-3.6-flash"
+   FALLBACK_MODELS = "gemini-3.8-flash,gemini-3.5-flash,gemini-2.5-flash"
    EMBED_MODEL = "gemini-embedding-001"
    EMBED_DIM = "768"
    HF_DATASET_REPO = "your-username/snap2cook-corpus"

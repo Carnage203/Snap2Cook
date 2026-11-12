@@ -49,3 +49,27 @@ def call_with_retries(call: Callable[[], T], error_cls: type[Snap2CookError], wh
             log.warning("%s failed (%s), retrying in %.1fs", what, type(exc).__name__, delay)
             sleep(delay)
     raise error_cls(f"{what} failed")  # unreachable; satisfies type checkers
+
+
+def model_chain(primary: str, fallbacks: tuple[str, ...]) -> tuple[str, ...]:
+    """Primary model first, then the fallbacks, without duplicates."""
+    return tuple(dict.fromkeys(m for m in (primary, *fallbacks) if m))
+
+
+def call_with_model_fallback(models: tuple[str, ...], call: Callable[[str], T], error_cls: type[Snap2CookError],
+                             what: str, retries: int = 2) -> T:
+    """Try each model in order; move to the next one when a model fails (overload, quota, bad name).
+
+    Models before the last get no retries (switching model is the retry); the last gets the full policy.
+    """
+    last_error: Snap2CookError | None = None
+    for index, model in enumerate(models):
+        last = index == len(models) - 1
+        try:
+            return call_with_retries(lambda: call(model), error_cls, f"{what} [{model}]", retries if last else 0)
+        except error_cls as exc:
+            last_error = exc
+            if not last:
+                log.warning("%s failed on %s, trying %s", what, model, models[index + 1])
+    assert last_error is not None
+    raise last_error

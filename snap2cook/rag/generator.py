@@ -10,7 +10,7 @@ from google.genai import types
 from pydantic import ValidationError
 
 from snap2cook.exceptions import GenerationError
-from snap2cook.gemini import call_with_retries
+from snap2cook.gemini import call_with_model_fallback
 from snap2cook.models import Conditions, GeneratedRecipe, Recipe
 from snap2cook.rag.reranker import ScoredRecipe
 from snap2cook.tiers import Tier
@@ -97,12 +97,12 @@ class VerbatimGenerator(Generator):
 class GeminiGenerator(Generator):
     """Gemini in JSON mode, grounded on the retrieved recipes, with one repair retry."""
 
-    def __init__(self, client: genai.Client, model: str, retries: int = 2) -> None:
-        self._client, self._model, self._retries = client, model, retries
+    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2) -> None:
+        self._client, self._models, self._retries = client, models, retries
 
     @property
     def name(self) -> str:
-        return f"gemini:{self._model}"
+        return f"gemini:{self._models[0]}"
 
     @staticmethod
     def build_prompt(ctx: GenerationContext, problems: list[str] | None = None) -> str:
@@ -121,9 +121,9 @@ class GeminiGenerator(Generator):
             prompt += "\n\nYour previous answer broke these rules, fix them:\n- " + "\n- ".join(problems)
         return prompt
 
-    def _call(self, prompt: str) -> str | None:
+    def _call(self, model: str, prompt: str) -> str | None:
         response = self._client.models.generate_content(
-            model=self._model, contents=prompt,
+            model=model, contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json",
                                                response_schema=GeneratedRecipe, temperature=0.4))
         return response.text
@@ -131,8 +131,9 @@ class GeminiGenerator(Generator):
     def generate(self, ctx: GenerationContext) -> GeneratedRecipe:
         problems: list[str] = []
         for attempt in (1, 2):
-            text = call_with_retries(lambda: self._call(self.build_prompt(ctx, problems)),
-                                     GenerationError, "Generation request", self._retries)
+            text = call_with_model_fallback(
+                self._models, lambda model: self._call(model, self.build_prompt(ctx, problems)),
+                GenerationError, "Generation request", self._retries)
             try:
                 recipe = GeneratedRecipe.model_validate_json(text or "")
             except ValidationError:

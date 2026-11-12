@@ -30,6 +30,7 @@ class Settings:
     gemini_api_key: str = field(default="", repr=False)
     vision_model: str = "gemini-3.7-flash"
     gen_model: str = "gemini-3.7-flash"
+    fallback_models: tuple[str, ...] = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
     embed_model: str = "gemini-embedding-001"
     embed_dim: int = 768
     hf_dataset_repo: str = ""
@@ -70,6 +71,7 @@ class Settings:
             gemini_api_key=get("GEMINI_API_KEY"),
             vision_model=get("VISION_MODEL", defaults.vision_model),
             gen_model=get("GEN_MODEL", defaults.gen_model),
+            fallback_models=tuple(m.strip() for m in get("FALLBACK_MODELS", ",".join(defaults.fallback_models)).split(",") if m.strip()),
             embed_model=get("EMBED_MODEL", defaults.embed_model),
             embed_dim=int(get("EMBED_DIM", str(defaults.embed_dim))),
             hf_dataset_repo=get("HF_DATASET_REPO"),
