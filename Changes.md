@@ -55,3 +55,11 @@ Every change made while building Snap2Cook, with the reason. Newest decisions ar
 - Gemini returned `ServerError` for `gemini-3.7-flash` generation. The cause is unknown (outage, key problem or wrong model name). Check the model name in `.env` before relying on live mode.
 - Not yet done because they need you: building `embeddings.npy` (needs the key in `.env`), uploading to Hugging Face, GitHub push, Streamlit Cloud deploy, phone test with a real photo.
 - Not written yet: `docs/slides_outline.md` (CLAUDE.md §14 says build when asked).
+
+## 6. Model fallback and cloud corpus (later session)
+
+| Change | Why |
+|---|---|
+| `FALLBACK_MODELS` setting (default `gemini-3.8-flash,gemini-3.5-flash,gemini-2.5-flash`); `model_chain` and `call_with_model_fallback` in `gemini.py`; vision and generation try each model in order | `gemini-3.8-flash` returned 503 "high demand". Switching model is the retry, so models before the last get no retries; the last gets the full backoff policy. |
+| Main `VISION_MODEL`/`GEN_MODEL` set to `gemini-3.6-flash` | It answered when 3.8 was overloaded. Change in `.env` any time. |
+| Built `embeddings.npy`/`meta.json`, uploaded corpus to the Hugging Face dataset | Log shows `corpus source: cloud:hf:<repo>`; local copy remains the fallback. |
