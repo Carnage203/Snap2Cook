@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from snap2cook.cache import FileCache, LRUCache, TieredCache
 from snap2cook.config import Settings
 from snap2cook.gemini import build_client, model_chain
-from snap2cook.groq import GROQ_PREFIX, GroqClient
+from snap2cook.llm import GROQ_PREFIX, OPENROUTER_PREFIX, GroqClient, OpenRouterClient
 from snap2cook.limiter import RateLimiter
 from snap2cook.pipeline import Pipeline
 from snap2cook.rag.embedder import GeminiEmbedder, LexicalEmbedder
@@ -46,11 +46,17 @@ def build_app(settings: Settings) -> App:
     if settings.live_mode:
         client = build_client(settings)
         groq = GroqClient(settings.groq_api_key) if settings.groq_api_key else None
-        vision_models = model_chain(settings.vision_model, settings.fallback_models)
+        openrouter = OpenRouterClient(settings.openrouter_api_key) if settings.openrouter_api_key else None
+        # Fastest first (Groq vision), then Gemini Hydrogen, then OpenRouter as the last resort.
+        vision_models = tuple(dict.fromkeys((
+            *(f"{GROQ_PREFIX}{m}" for m in settings.groq_vision_models if groq),
+            settings.vision_model,
+            *(f"{OPENROUTER_PREFIX}{m}" for m in settings.openrouter_vision_models if openrouter))))
+        chat_clients = {c.prefix: c for c in (groq, openrouter) if c}
         # Groq answers fast, so it does all generation; Gemini is only the fallback when no Groq key is set.
         gen_models = (tuple(f"{GROQ_PREFIX}{m}" for m in settings.groq_gen_models) if groq
                       else model_chain(settings.gen_model, settings.fallback_models))
-        vision = GeminiVisionProvider(client, vision_models, settings.api_retries)
+        vision = GeminiVisionProvider(client, vision_models, settings.api_retries, chat_clients)
         embedder = GeminiEmbedder(client, settings.embed_model, settings.embed_dim, settings.api_retries)
         generator = GeminiGenerator(client, gen_models, settings.api_retries, groq)
     else:

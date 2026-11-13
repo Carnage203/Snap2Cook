@@ -9,10 +9,13 @@ from pydantic import ValidationError
 
 from snap2cook.exceptions import NoIngredientsDetectedError, VisionProviderError
 from snap2cook.gemini import call_with_model_fallback
+from snap2cook.llm import GROQ_PREFIX, OPENROUTER_PREFIX, ChatClient
 from snap2cook.models import DetectedIngredient, DetectionResult
 from snap2cook.vision.base import VisionProvider
 
 log = logging.getLogger("snap2cook.vision")
+JSON_INSTRUCTION = ('Reply with ONLY one JSON object like {"ingredients": [{"name": "egg", "confidence": 0.9}]} '
+                    "using exactly those keys.")
 FAST_THINKING = types.ThinkingConfig(thinking_level="low")  # naming foods needs no deep reasoning
 
 PROMPT = (
@@ -24,18 +27,26 @@ PROMPT = (
 
 
 class GeminiVisionProvider(VisionProvider):
-    """Calls Gemini in JSON mode with a pydantic response schema."""
+    """Detects ingredients along a model chain: Gemini directly, Groq/OpenRouter via ``chat_clients``."""
 
-    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2) -> None:
+    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2,
+                 chat_clients: dict[str, ChatClient] | None = None) -> None:
         self._client = client
+        self._chat = chat_clients or {}
         self._models = models
         self._retries = retries
 
     @property
     def name(self) -> str:
-        return f"gemini:{self._models[0]}"
+        return f"vision:{self._models[0]}"
 
     def _call(self, model: str, image_bytes: bytes) -> str | None:
+        for prefix, chat in self._chat.items():
+            if model.startswith(prefix):
+                return chat.chat_json(model, PROMPT + " " + JSON_INSTRUCTION, image_jpeg=image_bytes,
+                                      temperature=0.0, max_tokens=400)
+        if model.startswith((GROQ_PREFIX, OPENROUTER_PREFIX)):
+            raise VisionProviderError(f"{model} is in the chain but its provider has no API key")
         response = self._client.models.generate_content(
             model=model,
             contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), PROMPT],

@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from snap2cook.exceptions import GenerationError
 from snap2cook.gemini import call_with_model_fallback
-from snap2cook.groq import GroqClient, is_groq
+from snap2cook.llm import GroqClient, is_groq
 from snap2cook.models import Conditions, GeneratedRecipe, Recipe
 from snap2cook.rag.reranker import ScoredRecipe
 from snap2cook.tiers import Tier

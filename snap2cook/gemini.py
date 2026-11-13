@@ -11,7 +11,7 @@ from google.genai import types
 
 from snap2cook.config import Settings
 from snap2cook.exceptions import Snap2CookError
-from snap2cook.groq import GROQ_PREFIX
+from snap2cook.llm import GROQ_PREFIX
 
 log = logging.getLogger("snap2cook.gemini")
 T = TypeVar("T")
