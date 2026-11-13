@@ -1,6 +1,7 @@
 """Recipe generation grounded on retrieved recipes, with validation and fallback."""
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -11,11 +12,13 @@ from pydantic import ValidationError
 
 from snap2cook.exceptions import GenerationError
 from snap2cook.gemini import call_with_model_fallback
+from snap2cook.groq import GroqClient, is_groq
 from snap2cook.models import Conditions, GeneratedRecipe, Recipe
 from snap2cook.rag.reranker import ScoredRecipe
 from snap2cook.tiers import Tier
 
 log = logging.getLogger("snap2cook.generator")
+SCHEMA_JSON = json.dumps(GeneratedRecipe.model_json_schema())
 
 SAFETY_DEFAULT = ("Be careful with hot water and hot surfaces. Cook eggs and meat all the way through, "
                   "and check ingredients for allergens such as nuts and dairy.")
@@ -97,8 +100,9 @@ class VerbatimGenerator(Generator):
 class GeminiGenerator(Generator):
     """Gemini in JSON mode, grounded on the retrieved recipes, with one repair retry."""
 
-    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2) -> None:
-        self._client, self._models, self._retries = client, models, retries
+    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2,
+                 groq: GroqClient | None = None) -> None:
+        self._client, self._models, self._retries, self._groq = client, models, retries, groq
 
     @property
     def name(self) -> str:
@@ -122,6 +126,10 @@ class GeminiGenerator(Generator):
         return prompt
 
     def _call(self, model: str, prompt: str) -> str | None:
+        if is_groq(model):
+            if self._groq is None:
+                raise GenerationError("Groq model in chain but no Groq key configured")
+            return self._groq.chat_json(model, prompt + "\n\nReply with JSON matching this schema: " + SCHEMA_JSON)
         response = self._client.models.generate_content(
             model=model, contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json",

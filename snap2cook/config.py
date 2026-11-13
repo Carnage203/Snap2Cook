@@ -23,6 +23,11 @@ def _from_streamlit_secrets(key: str) -> str | None:
     return str(value) if value not in (None, "") else None
 
 
+def _csv(value: str) -> tuple[str, ...]:
+    """Split a comma-separated setting into a tuple of non-empty items."""
+    return tuple(m.strip() for m in value.split(",") if m.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     """Immutable configuration. The API key is hidden from ``repr``."""
@@ -31,6 +36,9 @@ class Settings:
     vision_model: str = "gemini-3.7-flash"
     gen_model: str = "gemini-3.7-flash"
     fallback_models: tuple[str, ...] = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
+    groq_api_key: str = field(default="", repr=False)
+    groq_vision_models: tuple[str, ...] = ("qwen/qwen3.8-27b",)
+    groq_gen_models: tuple[str, ...] = ("openai/gpt-oss-20b", "qwen/qwen3.8-27b")
     embed_model: str = "gemini-embedding-001"
     embed_dim: int = 768
     hf_dataset_repo: str = ""
@@ -72,7 +80,10 @@ class Settings:
             gemini_api_key=get("GEMINI_API_KEY"),
             vision_model=get("VISION_MODEL", defaults.vision_model),
             gen_model=get("GEN_MODEL", defaults.gen_model),
-            fallback_models=tuple(m.strip() for m in get("FALLBACK_MODELS", ",".join(defaults.fallback_models)).split(",") if m.strip()),
+            fallback_models=_csv(get("FALLBACK_MODELS", ",".join(defaults.fallback_models))),
+            groq_api_key=get("GROQ_API_KEY"),
+            groq_vision_models=_csv(get("GROQ_VISION_MODELS", ",".join(defaults.groq_vision_models))),
+            groq_gen_models=_csv(get("GROQ_GEN_MODELS", ",".join(defaults.groq_gen_models))),
             embed_model=get("EMBED_MODEL", defaults.embed_model),
             embed_dim=int(get("EMBED_DIM", str(defaults.embed_dim))),
             hf_dataset_repo=get("HF_DATASET_REPO"),

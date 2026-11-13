@@ -11,6 +11,7 @@ from google.genai import types
 
 from snap2cook.config import Settings
 from snap2cook.exceptions import Snap2CookError
+from snap2cook.groq import GROQ_PREFIX
 
 log = logging.getLogger("snap2cook.gemini")
 T = TypeVar("T")
@@ -51,9 +52,10 @@ def call_with_retries(call: Callable[[], T], error_cls: type[Snap2CookError], wh
     raise error_cls(f"{what} failed")  # unreachable; satisfies type checkers
 
 
-def model_chain(primary: str, fallbacks: tuple[str, ...]) -> tuple[str, ...]:
-    """Primary model first, then the fallbacks, without duplicates."""
-    return tuple(dict.fromkeys(m for m in (primary, *fallbacks) if m))
+def model_chain(primary: str, fallbacks: tuple[str, ...], groq_models: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """Primary Gemini model, then fast Groq models, then the other Gemini fallbacks, without duplicates."""
+    groq = tuple(f"{GROQ_PREFIX}{m}" for m in groq_models)
+    return tuple(dict.fromkeys(m for m in (primary, *groq, *fallbacks) if m))
 
 
 def call_with_model_fallback(models: tuple[str, ...], call: Callable[[str], T], error_cls: type[Snap2CookError],
