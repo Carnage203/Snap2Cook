@@ -13,7 +13,7 @@ from snap2cook.exceptions import (
 from snap2cook.limiter import RateLimiter
 from snap2cook.models import HOSTEL_TECHNIQUES, Conditions, DetectedIngredient
 from snap2cook.tiers import TierFactory
-from snap2cook.vision.image_utils import ImageValidator
+from snap2cook.vision.image_utils import MAX_SIDE, ImageValidator
 from snap2cook.vision.normalizer import IngredientNormalizer
 
 
@@ -128,7 +128,7 @@ def _png(size=(50, 40)) -> bytes:
 
 def test_image_validator_accepts_png_and_resizes() -> None:
     prepared = ImageValidator().prepare(_png((3000, 1500)))
-    assert max(prepared.width, prepared.height) == 1024 and len(prepared.sha256) == 64
+    assert max(prepared.width, prepared.height) == MAX_SIDE and len(prepared.sha256) == 64
     assert Image.open(io.BytesIO(prepared.data)).format == "JPEG"
 
 

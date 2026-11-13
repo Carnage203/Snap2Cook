@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -34,26 +35,29 @@ class LRUCache(Cache):
         self._max = max_size
         self._clock = clock
         self._data: OrderedDict[str, tuple[float | None, Any]] = OrderedDict()
+        self._lock = threading.Lock()  # sessions run in different threads
 
     def __len__(self) -> int:
         return len(self._data)
 
     def get(self, key: str) -> Any | None:
-        entry = self._data.get(key)
-        if entry is None:
-            return None
-        expires, value = entry
-        if expires is not None and expires < self._clock():
-            del self._data[key]
-            return None
-        self._data.move_to_end(key)
-        return value
+        with self._lock:
+            entry = self._data.get(key)
+            if entry is None:
+                return None
+            expires, value = entry
+            if expires is not None and expires < self._clock():
+                del self._data[key]
+                return None
+            self._data.move_to_end(key)
+            return value
 
     def set(self, key: str, value: Any, ttl: float | None = None) -> None:
-        self._data[key] = (self._clock() + ttl if ttl else None, value)
-        self._data.move_to_end(key)
-        while len(self._data) > self._max:
-            self._data.popitem(last=False)
+        with self._lock:
+            self._data[key] = (self._clock() + ttl if ttl else None, value)
+            self._data.move_to_end(key)
+            while len(self._data) > self._max:
+                self._data.popitem(last=False)
 
 
 class FileCache(Cache):

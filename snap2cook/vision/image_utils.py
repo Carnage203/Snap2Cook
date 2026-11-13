@@ -10,7 +10,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from snap2cook.exceptions import InvalidImageError
 
 MAX_BYTES = 5 * 1024 * 1024
-MAX_SIDE = 1024
+MAX_SIDE = 768
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 
 

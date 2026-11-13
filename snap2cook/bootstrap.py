@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from snap2cook.cache import FileCache, LRUCache, TieredCache
 from snap2cook.config import Settings
 from snap2cook.gemini import build_client, model_chain
-from snap2cook.groq import GroqClient
+from snap2cook.groq import GROQ_PREFIX, GroqClient
 from snap2cook.limiter import RateLimiter
 from snap2cook.pipeline import Pipeline
 from snap2cook.rag.embedder import GeminiEmbedder, LexicalEmbedder
@@ -47,8 +47,9 @@ def build_app(settings: Settings) -> App:
         client = build_client(settings)
         groq = GroqClient(settings.groq_api_key) if settings.groq_api_key else None
         vision_models = model_chain(settings.vision_model, settings.fallback_models)
-        gen_models = model_chain(settings.gen_model, settings.fallback_models,
-                                 settings.groq_gen_models if groq else ())
+        # Groq answers fast, so it does all generation; Gemini is only the fallback when no Groq key is set.
+        gen_models = (tuple(f"{GROQ_PREFIX}{m}" for m in settings.groq_gen_models) if groq
+                      else model_chain(settings.gen_model, settings.fallback_models))
         vision = GeminiVisionProvider(client, vision_models, settings.api_retries)
         embedder = GeminiEmbedder(client, settings.embed_model, settings.embed_dim, settings.api_retries)
         generator = GeminiGenerator(client, gen_models, settings.api_retries, groq)

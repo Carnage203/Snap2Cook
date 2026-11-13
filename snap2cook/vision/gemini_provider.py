@@ -13,6 +13,7 @@ from snap2cook.models import DetectedIngredient, DetectionResult
 from snap2cook.vision.base import VisionProvider
 
 log = logging.getLogger("snap2cook.vision")
+FAST_THINKING = types.ThinkingConfig(thinking_level="low")  # naming foods needs no deep reasoning
 
 PROMPT = (
     "List the raw food ingredients and ready-to-eat food items clearly visible in this photo. "
@@ -39,7 +40,8 @@ class GeminiVisionProvider(VisionProvider):
             model=model,
             contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), PROMPT],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json", response_schema=DetectionResult, temperature=0.0),
+                response_mime_type="application/json", response_schema=DetectionResult, temperature=0.0,
+                thinking_config=FAST_THINKING if model.startswith("gemini-4") else None),
         )
         return response.text
 

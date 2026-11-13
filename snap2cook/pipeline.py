@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Sequence
 
 import pandas as pd
@@ -58,12 +59,17 @@ class Pipeline:
 
         A photo with nothing recognisable is skipped; the call fails only if every photo is empty.
         """
-        parts, empty = [], 0
-        for image in images[: self._settings.max_photos]:
+        def run(image: PreparedImage) -> pd.Series | None:
             try:
-                parts.append(self.detect(image)[0])
+                return self.detect(image)[0]
             except NoIngredientsDetectedError:
-                empty += 1
+                return None
+
+        batch = list(images[: self._settings.max_photos])
+        with ThreadPoolExecutor(max_workers=max(1, len(batch))) as pool:  # photos are independent API calls
+            results = list(pool.map(run, batch))
+        parts = [r for r in results if r is not None]
+        empty = len(results) - len(parts)
         merged = merge_ingredient_series(parts)
         if merged.empty:
             raise NoIngredientsDetectedError("No ingredients found in any photo")
