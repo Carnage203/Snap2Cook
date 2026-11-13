@@ -18,7 +18,13 @@ from snap2cook.rag.reranker import ScoredRecipe
 from snap2cook.tiers import Tier
 
 log = logging.getLogger("snap2cook.generator")
-SCHEMA_JSON = json.dumps(GeneratedRecipe.model_json_schema())
+JSON_EXAMPLE = json.dumps({
+    "title": "Recipe name", "time_min": 15, "ingredients_used": ["egg"], "extra_needed": [],
+    "techniques_used": ["mix"], "steps": ["First step.", "Second step."],
+    "substitutions": ["Optional swap or tip."], "safety_note": "Short safety advice.",
+    "source_recipe_ids": ["r001"]})
+JSON_INSTRUCTION = ("Reply with ONLY one JSON object using exactly these keys and value types "
+                    "(replace the example values): " + JSON_EXAMPLE)
 
 SAFETY_DEFAULT = ("Be careful with hot water and hot surfaces. Cook eggs and meat all the way through, "
                   "and check ingredients for allergens such as nuts and dairy.")
@@ -129,7 +135,7 @@ class GeminiGenerator(Generator):
         if is_groq(model):
             if self._groq is None:
                 raise GenerationError("Groq model in chain but no Groq key configured")
-            return self._groq.chat_json(model, prompt + "\n\nReply with JSON matching this schema: " + SCHEMA_JSON)
+            return self._groq.chat_json(model, prompt + "\n\n" + JSON_INSTRUCTION)
         response = self._client.models.generate_content(
             model=model, contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json",

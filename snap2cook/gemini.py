@@ -17,6 +17,8 @@ log = logging.getLogger("snap2cook.gemini")
 T = TypeVar("T")
 
 _FATAL_CODES = {400, 401, 403, 404}
+COOLDOWN_S = 90.0
+_cooldown_until: dict[str, float] = {}  # model -> time before which it is skipped after a failure
 
 
 def build_client(settings: Settings) -> genai.Client:
@@ -67,11 +69,16 @@ def call_with_model_fallback(models: tuple[str, ...], call: Callable[[str], T], 
     last_error: Snap2CookError | None = None
     for index, model in enumerate(models):
         last = index == len(models) - 1
+        if not last and _cooldown_until.get(model, 0.0) > time.monotonic():
+            log.info("skipping %s (recent failure)", model)
+            continue
         try:
             return call_with_retries(lambda: call(model), error_cls, f"{what} [{model}]", retries if last else 0)
         except error_cls as exc:
             last_error = exc
+            _cooldown_until[model] = time.monotonic() + COOLDOWN_S
+            log.warning("%s failed on %s: %s", what, model, exc.message)
             if not last:
-                log.warning("%s failed on %s, trying %s", what, model, models[index + 1])
+                log.info("trying %s next", models[index + 1])
     assert last_error is not None
     raise last_error

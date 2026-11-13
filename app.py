@@ -1,6 +1,7 @@
 """Snap2Cook Streamlit UI. Presentation only: all logic lives in the snap2cook package."""
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
@@ -14,6 +15,8 @@ from snap2cook.logging_setup import new_request_id, setup_logging
 from snap2cook.models import Conditions, PipelineResult
 from snap2cook.tiers import Tier, TierFactory
 from snap2cook.vision.image_utils import ImageValidator
+
+log = logging.getLogger("snap2cook.app")
 
 st.set_page_config(page_title="Snap2Cook", page_icon="🍳", layout="centered")
 
@@ -83,6 +86,7 @@ def detect_from_photo(app: App) -> None:
             if empty:
                 st.info(f"{empty} photo(s) showed no recognisable food and were skipped.")
     except Snap2CookError as exc:
+        log.warning("UI error: %s", exc.message)
         st.session_state["image_hash"] = None
         st.warning(exc.user_message)
 
@@ -131,6 +135,7 @@ def cook_section(app: App, tier: Tier, conditions: Conditions, extras: list[str]
                 result = app.pipeline.recommend(names, tier, conditions, extras, st.session_state["sid"])
             st.session_state["result"] = result
         except Snap2CookError as exc:
+            log.warning("UI error: %s", exc.message)
             st.session_state.pop("result", None)
             st.error(exc.user_message)
     if "result" in st.session_state:
@@ -144,6 +149,7 @@ def main() -> None:
         app = get_app(code_version())
         tier, conditions, extras = sidebar(app)
     except Snap2CookError as exc:
+        log.warning("UI error: %s", exc.message)
         st.error(exc.user_message)
         st.stop()
     st.title("Snap2Cook")

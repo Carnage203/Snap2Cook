@@ -1,7 +1,6 @@
 """Gemini-backed ingredient detection."""
 from __future__ import annotations
 
-import json
 import logging
 
 from google import genai
@@ -10,7 +9,6 @@ from pydantic import ValidationError
 
 from snap2cook.exceptions import NoIngredientsDetectedError, VisionProviderError
 from snap2cook.gemini import call_with_model_fallback
-from snap2cook.groq import GroqClient, is_groq
 from snap2cook.models import DetectedIngredient, DetectionResult
 from snap2cook.vision.base import VisionProvider
 
@@ -24,28 +22,19 @@ PROMPT = (
 )
 
 
-SCHEMA_HINT = "Reply with JSON matching this schema: " + json.dumps(DetectionResult.model_json_schema())
-
-
 class GeminiVisionProvider(VisionProvider):
-    """Calls Gemini in JSON mode (pydantic schema), falling back along the chain to Groq vision."""
+    """Calls Gemini in JSON mode with a pydantic response schema."""
 
-    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2,
-                 groq: GroqClient | None = None) -> None:
+    def __init__(self, client: genai.Client, models: tuple[str, ...], retries: int = 2) -> None:
         self._client = client
         self._models = models
         self._retries = retries
-        self._groq = groq
 
     @property
     def name(self) -> str:
         return f"gemini:{self._models[0]}"
 
     def _call(self, model: str, image_bytes: bytes) -> str | None:
-        if is_groq(model):
-            if self._groq is None:
-                raise VisionProviderError("Groq model in chain but no Groq key configured")
-            return self._groq.chat_json(model, PROMPT + " " + SCHEMA_HINT, image_jpeg=image_bytes, temperature=0.0)
         response = self._client.models.generate_content(
             model=model,
             contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), PROMPT],

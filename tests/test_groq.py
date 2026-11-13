@@ -21,3 +21,17 @@ def test_failing_gemini_falls_through_to_groq() -> None:
         return "ok:" + model
     chain = model_chain("g-main", (), ("m1",))
     assert call_with_model_fallback(chain, call, GenerationError, "test") == "ok:groq:m1"
+
+
+def test_failed_model_is_skipped_during_cooldown() -> None:
+    calls: list[str] = []
+
+    def call(model: str) -> str:
+        calls.append(model)
+        if model == "flaky":
+            raise GroqHTTPError(503, "overloaded")
+        return "ok"
+    chain = ("flaky", "groq:m1")
+    call_with_model_fallback(chain, call, GenerationError, "t")
+    call_with_model_fallback(chain, call, GenerationError, "t")
+    assert calls == ["flaky", "groq:m1", "groq:m1"]
